@@ -7,7 +7,7 @@ version of the same library. Decisions are therefore made per folder hierarchy:
 - CONFIRM: a block whose component/version is its folder's main version.
 - IGNORE: a block whose component/version differs from the folder's main version,
   when the main version is also among the block's alternate matches. Only applied
-  under --apply.
+  under --update_bom.
 - INDETERMINATE: anything else (no clear folder majority, or no alternate support for
   the main version). Left NOT_REVIEWED.
 

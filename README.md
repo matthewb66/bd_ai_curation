@@ -9,9 +9,6 @@ deterministic fuzzy-matching heuristics.
 
 ## Architecture
 
-- **MCP** (`blackduck-bdsca-mcp`) is used only for what it actually exposes:
-  listing projects/versions, and a basic component listing (name/version/origin,
-  no `matchTypes`).
 - **Direct REST API** (via the `blackduck` Python package) is used for everything
   curation-specific: BOM components with `matchTypes`, `matched-files`,
   `review-components` (Match Review/snippets), and all BOM mutations
@@ -39,33 +36,27 @@ Black Duck server used by the connected MCP plugin):
 
 - `BLACKDUCK_URL` / `BLACKDUCK_API_TOKEN` (REST API) - falls back to
   `BLACKDUCK_BDSCA_URL` / `BLACKDUCK_BDSCA_TOKEN` if unset.
-- `BLACKDUCK_BDSCA_URL` / `BLACKDUCK_BDSCA_TOKEN` (MCP server).
 - `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN` (or `ANTHROPIC_API_KEY`) for the
   Claude curation calls.
 
 ## Usage
 
 ```bash
-# Discovery (MCP-backed)
-bd-ai-curate list-projects
-bd-ai-curate list-versions "Small Demo Main"
-bd-ai-curate list-components "Small Demo Main" 1.0_latest
-
 # Curation (REST + LLM). Dry-run by default - reports proposed decisions only.
-bd-ai-curate curate "Small Demo Main" 1.0_latest --report_file report.txt
+bd-ai-curate "Small Demo Main" 1.0_latest --report_file report.txt
 
 # Include Match Review (snippet/low-match-score + unmatched) components
-bd-ai-curate curate "Small Demo Main" 1.0_latest --include_match_review
+bd-ai-curate "Small Demo Main" 1.0_latest --include_match_review
 
 # Strip known-noise matched file paths (tests, Coverity 'idir' scan dirs, Detect
 # run folders/jars, virtualenv folders, hidden dot-folders) before curation
-bd-ai-curate curate "Small Demo Main" 1.0_latest --filter_paths
+bd-ai-curate "Small Demo Main" 1.0_latest --filter_paths
 
 # Also curate unconfirmed (NOT_REVIEWED) snippet matches, grouped by component
-bd-ai-curate curate "Small Demo Main" 1.0_latest --unconfirmed_snippets
+bd-ai-curate "Small Demo Main" 1.0_latest --include_unconfirmed_snippets
 
 # Apply decisions to the live BOM (only after reviewing a dry-run report!)
-bd-ai-curate curate "Small Demo Main" 1.0_latest --apply
+bd-ai-curate "Small Demo Main" 1.0_latest --update_bom
 ```
 
 ### `--filter_paths`
@@ -82,7 +73,37 @@ spending an LLM call on it - these are reported with confidence 1.0 and a
 reasoning string that cites the number of noise paths removed. Dependency
 matches are unaffected (they don't rely on matched-file evidence).
 
-### `--unconfirmed_snippets`
+### `--include_match_review`
+
+Adds Match Review items to the run. Without this flag, only the components already
+in the BOM are curated. The flag is additive: BOM components are still curated, and
+Match Review items are added to the same run.
+
+Match Review items come from `review-components` (bill-of-materials-5), which the
+server returns in two kinds:
+
+- `LOW_MATCH_SCORE` - snippet or low-score matches not yet in the BOM. These are
+  fetched with their matched-file paths and go through the same LLM and grouping
+  path as BOM components. The LLM may propose `CONFIRM_MATCH_REVIEW` or
+  `REJECT_MATCH_REVIEW` for these, since they must be actioned through the
+  `match-review/bulk-adjustment` endpoint rather than `bulk-adjustment`.
+- `UNMATCHED` - declared components with no signature-path evidence. These are
+  dropped in `bom_data.fetch_review_components` before curation, and the count is
+  logged as "UNMATCHED skipped - no signature evidence". They produce no decision
+  and are not written to the BOM.
+
+Under `--update_bom`, a confirmed `LOW_MATCH_SCORE` item is added to the BOM and
+marked `REVIEWED`, and gets an audit comment (`apply_confirm_match_review`). A
+rejected one is marked `ignored` in Match Review (`apply_reject_match_review`);
+this path does not post a comment.
+
+`--filter_paths` applies to Match Review items too. A `LOW_MATCH_SCORE` item with
+no real matched paths left after filtering is auto-rejected without an LLM call.
+
+Match Review snippets are a different source from the per-file snippet blocks in
+`--include_unconfirmed_snippets`, which are not covered by this flag.
+
+### `--include_unconfirmed_snippets`
 
 Fetches the snippet matches that are still `NOT_REVIEWED` in the version's
 `source-bom-entries` (the same internal endpoint `ignore_snippets.py` uses) and
@@ -101,7 +122,7 @@ writes to the live BOM:
   `NOT_REVIEWED`.
 - Otherwise the component is `NO_ACTION_MANUAL_REVIEW` and left untouched.
 
-Dry-run reports the proposed confirmations. Only `--apply` writes them, via
+Dry-run reports the proposed confirmations. Only `--update_bom` writes them, via
 `PUT .../bulk-snippet-bom-entries` in chunks of 100.
 
 Every `curate` run (dry-run or applied) writes a JSON decision log
@@ -122,9 +143,9 @@ loss (verified against the sync baseline).
 
 ## Safety
 
-`curate` is **dry-run by default**. BOM mutations only happen when `--apply` is
+`curate` is **dry-run by default**. BOM mutations only happen when `--update_bom` is
 explicitly passed. Decisions with action `NO_ACTION_MANUAL_REVIEW` are never
-applied regardless of `--apply` - they're always left for a human.
+applied regardless of `--update_bom` - they're always left for a human.
 
 `UNMATCHED` Match Review items (declared/manifest components with zero
 signature-path evidence) are never sent to the LLM for an automatic decision -

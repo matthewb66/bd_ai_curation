@@ -22,7 +22,6 @@ dependencies = [
     "rapidfuzz",
     "pydantic>=2",
     "anthropic",
-    "mcp",
 ]
 
 [project.optional-dependencies]

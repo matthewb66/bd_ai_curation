@@ -1,7 +1,6 @@
 import asyncio
 import logging
-
-from tabulate import tabulate
+from datetime import date
 
 from . import bom_data
 from . import bom_writer
@@ -9,59 +8,12 @@ from . import config
 from . import curation_engine
 from . import global_values
 from . import grouping
-from . import mcp_client
 from . import path_filters
 from . import reporting
 from . import rest_client
 from . import snippet_curation
 from . import version_resolver
 from .models import CurationAction, CurationDecision
-
-def cmd_list_projects():
-    projects = asyncio.run(mcp_client.list_projects_async())
-    table = [[p.get("name", ""), p.get("project_id", "")] for p in projects]
-    print(f"Found {len(projects)} projects.\n")
-    print(tabulate(table, headers=["Name", "ID"]))
-
-
-def cmd_list_versions():
-    # The MCP server's query matching is unreliable for full/exact project names
-    # (observed empty results for e.g. "Small Demo Main" or "Small Demo", but not
-    # "Demo") - fetch unfiltered and match the exact name client-side instead.
-    projects = asyncio.run(mcp_client.list_projects_async())
-    match = next((p for p in projects if p.get("name") == global_values.bd_project), None)
-    if not match:
-        logging.error(f"Project '{global_values.bd_project}' not found")
-        return
-
-    versions = asyncio.run(mcp_client.list_versions_async(match["project_id"]))
-    table = [[v.get("name", ""), v.get("project_version_id", "")] for v in versions]
-    print(f"Found {len(versions)} versions for project '{global_values.bd_project}'.\n")
-    print(tabulate(table, headers=["Name", "ID"]))
-
-
-def cmd_list_components():
-    # See cmd_list_versions() - exact-name query filtering is unreliable, so fetch
-    # unfiltered and match client-side.
-    projects = asyncio.run(mcp_client.list_projects_async())
-    proj_match = next((p for p in projects if p.get("name") == global_values.bd_project), None)
-    if not proj_match:
-        logging.error(f"Project '{global_values.bd_project}' not found")
-        return
-
-    versions = asyncio.run(mcp_client.list_versions_async(proj_match["project_id"]))
-    ver_match = next((v for v in versions if v.get("name") == global_values.bd_version), None)
-    if not ver_match:
-        logging.error(f"Version '{global_values.bd_version}' not found in project '{global_values.bd_project}'")
-        return
-
-    rows = asyncio.run(mcp_client.list_components_async(proj_match["project_id"], ver_match["project_version_id"]))
-    table = [[r.get("component_name", ""), r.get("component_version_name", ""), r.get("origin_external_id", "")]
-             for r in rows]
-    unique_pairs = {(r.get("component_name", ""), r.get("component_version_name", "")) for r in rows}
-    print(f"Found {len(unique_pairs)} components ({len(rows)} rows - one per origin).\n")
-    print(tabulate(table, headers=["Component", "Version", "Origin"]))
-
 
 async def cmd_curate_async():
     projver = rest_client.get_project_version(global_values.bd_project, global_values.bd_version)
@@ -212,8 +164,12 @@ async def cmd_curate_async():
         logging.info(f"Applying {len(actionable)} decisions to the BOM ...")
         apply_results = await bom_writer.apply_decisions(projver_href, actionable, snippet_plan)
         logging.info(f"Apply results: {apply_results}")
+        try:
+            await bom_writer.apply_project_version_comment(projver_href, projver, date.today().isoformat())
+        except Exception as exc:
+            logging.error(f"Failed to add the curation comment to the project version: {exc}")
     else:
-        logging.info("Dry-run complete - no changes applied. Re-run with --apply to write these decisions.")
+        logging.info("Dry-run complete - no changes applied. Re-run with --update_bom to write these decisions.")
 
     reporting.write_decisions_log(decisions, all_components, apply_results)
 
@@ -224,22 +180,9 @@ async def cmd_curate_async():
                      f"driving confirm or ignore decisions.")
 
 
-def cmd_curate():
-    asyncio.run(cmd_curate_async())
-
-
 def main():
     config.check_args()
-
-    command = config.args.command
-    if command == 'list-projects':
-        cmd_list_projects()
-    elif command == 'list-versions':
-        cmd_list_versions()
-    elif command == 'list-components':
-        cmd_list_components()
-    elif command == 'curate':
-        cmd_curate()
+    asyncio.run(cmd_curate_async())
 
 
 if __name__ == '__main__':

@@ -55,7 +55,7 @@ def report_summary(decisions: list[CurationDecision], total_components: int):
     table = [[action, count] for action, count in sorted(counts.items())]
     table.append(["TOTAL COMPONENTS CONSIDERED", total_components])
 
-    mode = "APPLIED" if global_values.apply else "DRY-RUN (not applied - use --apply to write changes)"
+    mode = "APPLIED" if global_values.apply else "DRY-RUN (not applied - use --update_bom to write changes)"
     print(f"SUMMARY ({mode}):")
     print(tabulate(table, headers=["Action", "Count"], tablefmt="simple"))
     print()

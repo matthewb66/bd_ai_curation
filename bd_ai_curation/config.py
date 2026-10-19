@@ -8,67 +8,40 @@ from . import global_values
 parser = argparse.ArgumentParser(description='Black Duck AI Curation Service',
                                   prog='bd-ai-curate')
 
-subparsers = parser.add_subparsers(dest='command', required=True)
-
-# --- shared connection args, added to every subcommand ---
-
-
-def add_connection_args(sp):
-    sp.add_argument("--blackduck_url", type=str, help="Black Duck server URL (REQUIRED, or set BLACKDUCK_URL)",
+parser.add_argument('project', help='Black Duck project name')
+parser.add_argument('version', help='Black Duck project version name')
+parser.add_argument("--blackduck_url", type=str, help="Black Duck server URL (REQUIRED, or set BLACKDUCK_URL)",
                      default="")
-    sp.add_argument("--blackduck_api_token", type=str,
+parser.add_argument("--blackduck_api_token", type=str,
                      help="Black Duck API token (REQUIRED, or set BLACKDUCK_API_TOKEN)", default="")
-    sp.add_argument("--blackduck_trust_cert", help="Black Duck trust server cert", action='store_true')
-    sp.add_argument("--debug", help="Debug logging mode", action='store_true')
-    sp.add_argument("--logfile", help="Logging output file", default="")
-
-
-# --- list-projects ---
-sp_list_projects = subparsers.add_parser('list-projects', help='List all Black Duck projects (via MCP)')
-add_connection_args(sp_list_projects)
-
-# --- list-versions ---
-sp_list_versions = subparsers.add_parser('list-versions', help='List versions of a Black Duck project (via MCP)')
-sp_list_versions.add_argument('project', help='Black Duck project name')
-add_connection_args(sp_list_versions)
-
-# --- list-components ---
-sp_list_components = subparsers.add_parser('list-components',
-                                            help='List components in a project version (via MCP, basic fields only)')
-sp_list_components.add_argument('project', help='Black Duck project name')
-sp_list_components.add_argument('version', help='Black Duck project version name')
-add_connection_args(sp_list_components)
-
-# --- curate ---
-sp_curate = subparsers.add_parser('curate', help='Run LLM-driven BOM curation on a project version')
-sp_curate.add_argument('project', help='Black Duck project name')
-sp_curate.add_argument('version', help='Black Duck project version name')
-add_connection_args(sp_curate)
-sp_curate.add_argument("--apply", help="Apply proposed decisions to the BOM (default is dry-run/report only)",
+parser.add_argument("--blackduck_trust_cert", help="Black Duck trust server cert", action='store_true')
+parser.add_argument("--debug", help="Debug logging mode", action='store_true')
+parser.add_argument("--logfile", help="Logging output file", default="")
+parser.add_argument("--update_bom", help="Apply proposed decisions to the BOM (default is dry-run/report only)",
                         action='store_true')
-sp_curate.add_argument("--include_match_review",
+parser.add_argument("--include_match_review",
                         help="Also fetch and curate Match Review (snippet/low-match-score and unmatched) components",
                         action='store_true')
-sp_curate.add_argument("--unconfirmed_snippets",
+parser.add_argument("--include_unconfirmed_snippets",
                         help="Also curate unconfirmed (NOT_REVIEWED) snippet matches, grouped by the reported "
                              "component/version. Strong matches are confirmed (added to the BOM and marked "
-                             "REVIEWED) only with --apply; all others are left for manual review",
+                             "REVIEWED) only with --update_bom; all others are left for manual review",
                         action='store_true')
-sp_curate.add_argument("--filter_paths",
+parser.add_argument("--filter_paths",
                         help="Strip known-noise matched file paths (tests, Coverity 'idir' scan dirs, "
                              "Detect run folders/jars, virtualenv folders, hidden dot-folders) before curation; "
                              "a component left with no real evidence is auto-ignored/rejected without an LLM call",
                         action='store_true')
-sp_curate.add_argument("--max_components_per_llm_call", type=int, default=20,
+parser.add_argument("--max_components_per_llm_call", type=int, default=20,
                         help="Max number of components/groups to send to the LLM per call (default 20)")
-sp_curate.add_argument("--max_concurrent_rest_requests", type=int, default=10,
+parser.add_argument("--max_concurrent_rest_requests", type=int, default=10,
                         help="Max number of concurrent Black Duck REST calls (default 10)")
-sp_curate.add_argument("--max_concurrent_llm_calls", type=int, default=5,
+parser.add_argument("--max_concurrent_llm_calls", type=int, default=5,
                         help="Max number of concurrent Anthropic LLM calls (default 5)")
-sp_curate.add_argument("--model", type=str, default='claude-haiku-5-5',
+parser.add_argument("--model", type=str, default='claude-haiku-5-5',
                         help="Anthropic model to use for curation decisions")
-sp_curate.add_argument("--report_file", help="Text report output file", default="")
-sp_curate.add_argument("--decisions_file", help="JSON decision log output file (default: bd_ai_curation_decisions.json)",
+parser.add_argument("--report_file", help="Text report output file", default="")
+parser.add_argument("--decisions_file", help="JSON decision log output file (default: bd_ai_curation_decisions.json)",
                         default="bd_ai_curation_decisions.json")
 
 args = parser.parse_args()
@@ -120,36 +93,31 @@ def check_args():
     if trustcert == 'true' or args.blackduck_trust_cert:
         global_values.bd_trustcert = True
 
-    # MCP server reuses the same BDSCA env vars Claude Code's MCP plugin uses
-    global_values.mcp_url = os.environ.get('BLACKDUCK_BDSCA_URL', global_values.bd_url)
-    global_values.mcp_token = os.environ.get('BLACKDUCK_BDSCA_TOKEN', global_values.bd_api)
+    global_values.bd_project = args.project
+    global_values.bd_version = args.version
 
-    global_values.bd_project = getattr(args, 'project', '')
-    global_values.bd_version = getattr(args, 'version', '')
+    global_values.anthropic_base_url = os.environ.get('ANTHROPIC_BASE_URL', '')
+    global_values.anthropic_api_key = (os.environ.get('ANTHROPIC_AUTH_TOKEN')
+                                        or os.environ.get('ANTHROPIC_API_KEY'))
+    if not global_values.anthropic_api_key:
+        logging.error("Anthropic credentials not specified "
+                       "(set ANTHROPIC_AUTH_TOKEN/ANTHROPIC_API_KEY)")
+        terminate = True
 
-    if args.command == 'curate':
-        global_values.anthropic_base_url = os.environ.get('ANTHROPIC_BASE_URL', '')
-        global_values.anthropic_api_key = (os.environ.get('ANTHROPIC_AUTH_TOKEN')
-                                            or os.environ.get('ANTHROPIC_API_KEY'))
-        if not global_values.anthropic_api_key:
-            logging.error("Anthropic credentials not specified "
-                           "(set ANTHROPIC_AUTH_TOKEN/ANTHROPIC_API_KEY)")
-            terminate = True
+    global_values.apply = args.update_bom
+    global_values.include_match_review = args.include_match_review
+    global_values.unconfirmed_snippets = args.include_unconfirmed_snippets
+    global_values.filter_paths = args.filter_paths
+    global_values.max_components_per_llm_call = args.max_components_per_llm_call
+    global_values.max_concurrent_rest_requests = args.max_concurrent_rest_requests
+    global_values.max_concurrent_llm_calls = args.max_concurrent_llm_calls
+    global_values.llm_model = args.model
+    global_values.report_file = args.report_file
+    global_values.decisions_file = args.decisions_file
 
-        global_values.apply = args.apply
-        global_values.include_match_review = args.include_match_review
-        global_values.unconfirmed_snippets = args.unconfirmed_snippets
-        global_values.filter_paths = args.filter_paths
-        global_values.max_components_per_llm_call = args.max_components_per_llm_call
-        global_values.max_concurrent_rest_requests = args.max_concurrent_rest_requests
-        global_values.max_concurrent_llm_calls = args.max_concurrent_llm_calls
-        global_values.llm_model = args.model
-        global_values.report_file = args.report_file
-        global_values.decisions_file = args.decisions_file
-
-        if args.report_file and os.path.exists(args.report_file):
-            logging.error(f"Report file '{args.report_file}' already exists - exiting")
-            terminate = True
+    if args.report_file and os.path.exists(args.report_file):
+        logging.error(f"Report file '{args.report_file}' already exists - exiting")
+        terminate = True
 
     if terminate:
         sys.exit(2)

@@ -297,6 +297,20 @@ async def apply_consolidate(projver_href, decisions: list[CurationDecision]) -> 
     return len(succeeded_hrefs), failed
 
 
+async def apply_project_version_comment(projver_href, projver: dict, performed_on: str):
+    """Prepends an 'AI BOM Curation performed' line to the version's releaseComments,
+    keeping any existing comment below it. The version is written back with its
+    fetched fields unchanged apart from releaseComments.
+    """
+    existing = projver.get('releaseComments') or ''
+    stamp = f"AI BOM Curation performed - {performed_on}"
+    body = {key: value for key, value in projver.items() if key != '_meta'}
+    body['releaseComments'] = f"{stamp}\n{existing}" if existing else stamp
+    headers = {"Accept": "application/json", "Content-Type": "application/json"}
+    await _put(_rest_semaphore(), projver_href, body, headers)
+    logging.info(f"- Added '{stamp}' to the project version comment")
+
+
 def _snippet_update_body(base: str, block: SnippetBlock, ignored: bool, review_status: str) -> dict:
     """Body shape lifted from ignore_snippets.py::create_snippet_update_body (HUB-18270).
     sourceEndLines is +1 and the start/end lines come from the match, as the reference does.

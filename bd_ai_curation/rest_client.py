@@ -25,19 +25,27 @@ def check_projver(bd, proj, ver):
     projects = bd.get_resource('projects', params=params)
     for p in projects:
         if p['name'] == proj:
-            versions = bd.get_resource('versions', parent=p, params=params)
+            versions = list(bd.get_resource('versions', parent=p, params=params))
             for v in versions:
                 if v['versionName'] == ver:
                     return v
             break
     else:
         logging.error(f"Project '{proj}' does not exist")
-        print('Available projects:')
-        for proj_item in bd.get_resource('projects'):
-            print(proj_item['name'])
+        matches = sorted(p_item['name'] for p_item in bd.get_resource('projects')
+                         if proj.lower() in p_item['name'].lower())
+        if matches:
+            print(f"Projects containing '{proj}':")
+            for name in matches:
+                print(name)
+        else:
+            print(f"No projects contain '{proj}'")
         sys.exit(2)
 
     logging.error(f"Version '{ver}' does not exist in project '{proj}'")
+    print(f"Available versions in project '{proj}':")
+    for v in versions:
+        print(v['versionName'])
     sys.exit(2)
 
 

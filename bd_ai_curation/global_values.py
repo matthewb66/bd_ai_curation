@@ -7,8 +7,6 @@ bd_api = ''
 bd_url = ''
 bd_trustcert = False
 
-mcp_url = ''
-mcp_token = ''
 
 anthropic_base_url = ''
 anthropic_api_key = ''
