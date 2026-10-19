@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bd_ai_curation"
+version = "0.1.0"
+authors = [
+  { name="Matthew Brady", email="mbrad@synopsys.com" },
+]
+description = "Agentic Black Duck SCA BOM curation service - LLM-driven ignore/confirm/consolidate decisions for signature and Match Review components."
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "blackduck>1.0.3",
+    "tabulate",
+    "rapidfuzz",
+    "pydantic>=2",
+    "anthropic",
+    "mcp",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "INFO"
+
+[project.scripts]
+bd-ai-curate = "bd_ai_curation.main:main"
