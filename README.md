@@ -1,24 +1,23 @@
-# bd_ai_curation
+# bd_ai_curation - v0.1.0
 
-Agentic Black Duck SCA BOM curation service. Replicates manual BOM curation tasks -
-validating signature matches, finding duplicate/overlapping component entries, and
-confirming/rejecting Match Review (snippet) matches - using an LLM (Claude) to make
-the judgment calls that
-[`bd_sig_filter`](https://github.com/matthewb66/bd_sig_filter) makes with
-deterministic fuzzy-matching heuristics.
+Agentic Black Duck SCA BOM curation utility.
+Replicates manual BOM curation tasks -
+validating dependency/signature/binary matches, finding duplicate/overlapping component entries, and
+optionally confirming/rejecting Match Review matches and snippet matches - using an LLM (Claude).
 
-## Architecture
+##  Script Operation
 
-- **Direct REST API** (via the `blackduck` Python package) is used for everything
-  curation-specific: BOM components with `matchTypes`, `matched-files`,
-  `review-components` (Match Review/snippets), and all BOM mutations
-  (`bulk-adjustment`, `bulk-comment`, `match-review/bulk-adjustment`).
-- **Claude** (via the `anthropic` SDK) makes the ignore/confirm/consolidate
-  decisions, given structured BOM + matched-file-path data, forced into a
-  `submit_decisions` tool call validated against a pydantic schema.
+- Unless `--update_bom` is specified, no changes are made to the project version
+- Analysis results are shown in the log (console) and a decision JSON file is created with results of the analysis per component (default 'bd_ai_curation_decisions.json')
+- Where appropriate, match paths are inspected to assess the validity of components and versions.
+- The option `--include_match_review` will also process low match score components in the Match Review page
+- The option `--include_unconfirmed_snippets` will also process unconfirmed snippets, adding components to the BOM where snippet matches indicate their presence
+- The option `filter_paths` will look for test folders, dot folders, virtualenv, Black Duck tool and other folders and mark components within them as ignored
+- When `--update_bom` is specified, components will be marked as ignored or marked as reviewed if confirmed (with comments added to explain the decision). Components left without review status are intended for manual review. A project version comment is added to document the AI Review process.
 
-See `/Users/mbrad/.claude/plans/pasted-content-id-02b3-i-would-toasty-snowflake.md`
-for the full design rationale.
+Multiple match types are considered in the analysis including Dependency (all of which will be confirmed), Signature (exact file, exact folder, files modified), snippet (components already added to the BOM as snippets), binary with and without version and optionally match review (low match score only)/unconfirmed snipper matches.
+
+Duplicate or overlapping components across match types will be reviewed, choosing the strongest version match where appropriate across all match types.
 
 ## Installation
 
@@ -59,7 +58,7 @@ bd-ai-curate "Small Demo Main" 1.0_latest --include_unconfirmed_snippets
 bd-ai-curate "Small Demo Main" 1.0_latest --update_bom
 ```
 
-### `--filter_paths`
+### `--filter_paths` Option
 
 Strips matched file paths that fall under known build-tooling/scan-artifact
 locations before any grouping or LLM call: hidden dot-folders (`.git`, `.venv`,
@@ -73,7 +72,7 @@ spending an LLM call on it - these are reported with confidence 1.0 and a
 reasoning string that cites the number of noise paths removed. Dependency
 matches are unaffected (they don't rely on matched-file evidence).
 
-### `--include_match_review`
+### `--include_match_review` Option
 
 Adds Match Review items to the run. Without this flag, only the components already
 in the BOM are curated. The flag is additive: BOM components are still curated, and
@@ -103,7 +102,7 @@ no real matched paths left after filtering is auto-rejected without an LLM call.
 Match Review snippets are a different source from the per-file snippet blocks in
 `--include_unconfirmed_snippets`, which are not covered by this flag.
 
-### `--include_unconfirmed_snippets`
+### `--include_unconfirmed_snippets` Option
 
 Fetches the snippet matches that are still `NOT_REVIEWED` in the version's
 `source-bom-entries` (the same internal endpoint `ignore_snippets.py` uses) and
@@ -125,7 +124,7 @@ writes to the live BOM:
 Dry-run reports the proposed confirmations. Only `--update_bom` writes them, via
 `PUT .../bulk-snippet-bom-entries` in chunks of 100.
 
-Every `curate` run (dry-run or applied) writes a JSON decision log
+The utility (dry-run or applied) writes a JSON decision log
 (`--decisions_file`, default `bd_ai_curation_decisions.json`) for audit/replay,
 and prints a summary + per-component report table.
 
@@ -137,24 +136,8 @@ concurrently rather than one at a time, bounded by:
 - `--max_concurrent_rest_requests` (default `10`) - Black Duck REST calls.
 - `--max_concurrent_llm_calls` (default `5`) - Anthropic LLM calls.
 
-On a 644-component real-world project ("elasticsearch"), this took the full
-`curate` dry-run from several minutes down to ~100 seconds with zero coverage
-loss (verified against the sync baseline).
-
 ## Safety
 
-`curate` is **dry-run by default**. BOM mutations only happen when `--update_bom` is
-explicitly passed. Decisions with action `NO_ACTION_MANUAL_REVIEW` are never
-applied regardless of `--update_bom` - they're always left for a human.
+The script is **dry-run by default**. BOM mutations only happen when `--update_bom` is
 
-`UNMATCHED` Match Review items (declared/manifest components with zero
-signature-path evidence) are never sent to the LLM for an automatic decision -
-there's no evidence for it to reason over - and are always flagged for manual
-review, matching `bd_sig_filter`'s documented caution.
-
-## Out of scope (v1)
-
-Adding entirely new components to the BOM is not implemented - no verified Black
-Duck REST endpoint for this was found during design, and no reference
-implementation exists in sibling tooling. `CONSOLIDATE` decisions are implemented
-as "pick a survivor, ignore the rest" (there is no BOM "merge" API).
+explicitly passed.
