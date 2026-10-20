@@ -92,11 +92,15 @@ because the true owner is a different component.
 (match_review_type=LOW_MATCH_SCORE) items instead of CONFIRM_REVIEWED/IGNORE, since \
 these are not yet in the BOM and must be confirmed or rejected via the Match Review \
 API rather than simply reviewed/ignored.
-- CONSOLIDATE: only when entries describe the same occurrence of the software (e.g. \
-the same component id, or heavily overlapping matched paths pointing at the same file \
-or artifact). Pick the single best-supported entry as keep_href and list every other \
-entry's href in ignore_hrefs. Do not consolidate different versions that are matched \
-in different locations - confirm each one that has strong evidence instead.
+- CONSOLIDATE: only when entries describe the same occurrence of the software: the same \
+component id, or the same groupId and artifactId in input_external_id, with heavily \
+overlapping matched paths pointing at the same file or artifact. Different artifacts \
+(e.g. httpclient and httpclient5) are never consolidated, even if they share a path. \
+Pick the single best-supported entry as keep_href and list every other entry's href \
+in ignore_hrefs. Do not consolidate different versions that are matched in different \
+locations - confirm each one that has strong evidence instead. A CONSOLIDATE decision \
+must name its own keep_href and ignore_hrefs in the response and must not refer to \
+another decision in its reasoning; if you cannot decide, use NO_ACTION_MANUAL_REVIEW.
 
 For overlapping_match_consolidation tasks, the sibling components all match the same \
 folder (common_path_prefix). Decide what that location is once, then give the siblings \
@@ -204,6 +208,16 @@ def _reasoning_defers(reasoning: str) -> bool:
     return bool(_DEFER_PATTERNS.search(reasoning))
 
 
+_CROSS_REFERENCE_PATTERNS = re.compile(r"\b(see|refer to|per) (the |a |an )?(first|second|other|previous|above|below|\w+) decision\b|"
+                                       r"\bplaceholder\b", re.IGNORECASE)
+
+
+def _consolidate_is_malformed(decision: CurationDecision) -> bool:
+    if not decision.keep_href or not decision.ignore_hrefs:
+        return True
+    return bool(_CROSS_REFERENCE_PATTERNS.search(decision.reasoning))
+
+
 def _fallback_decision(comp: BomComponent, reason: str) -> CurationDecision:
     return CurationDecision(
         action=CurationAction.NO_ACTION_MANUAL_REVIEW,
@@ -276,6 +290,13 @@ async def _decisions_for_batch(client, sem: asyncio.Semaphore, task: str, batch,
             logging.warning(f"CONFIRM_REVIEWED for '{decision.target_name}/{decision.target_version}' "
                              f"contradicts its own reasoning - downgrading to NO_ACTION_MANUAL_REVIEW")
             decision.action = CurationAction.NO_ACTION_MANUAL_REVIEW
+        if decision.action == CurationAction.CONSOLIDATE and _consolidate_is_malformed(decision):
+            logging.warning(f"CONSOLIDATE for '{decision.target_name}/{decision.target_version}' is missing "
+                            f"keep_href/ignore_hrefs or defers to another decision - downgrading to "
+                            f"NO_ACTION_MANUAL_REVIEW")
+            decision.action = CurationAction.NO_ACTION_MANUAL_REVIEW
+            decision.keep_href = None
+            decision.ignore_hrefs = []
         decisions.append(decision)
         covered_hrefs.add(decision.target_href)
         covered_hrefs.update(decision.ignore_hrefs)

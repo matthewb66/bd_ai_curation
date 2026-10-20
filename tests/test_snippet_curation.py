@@ -143,7 +143,7 @@ def test_ignore_body_keeps_not_reviewed_and_sets_ignored():
 
 def test_noise_scanned_blocks_are_split_out_and_excluded_from_vote():
     from bd_ai_curation import path_filters
-    noise = [_block(f'n{i}', f'home/.blackduck/idir/emit/c{i}.h', ver='9.9', rel='r9') for i in range(5)]
+    noise = [_block(f'n{i}', f'tmp/cov/java-api-stubs.jar!/c{i}.h', ver='9.9', rel='r9') for i in range(5)]
     real = [_block('h1', 'src/a.h', ver='1.0', rel='r1'), _block('h2', 'src/b.h', ver='1.0', rel='r1')]
     kept, dropped = path_filters.split_noise_snippets(noise + real)
     assert {b.hash_id for b in kept} == {'h1', 'h2'}

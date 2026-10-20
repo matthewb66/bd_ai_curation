@@ -54,7 +54,7 @@ bd-ai-curate "Small Demo Main" 1.0_latest --include_match_review
 # Also curate unconfirmed (NOT_REVIEWED) snippet matches, grouped by component
 bd-ai-curate "Small Demo Main" 1.0_latest --include_unconfirmed_snippets
 
-# Strip known-noise matched file paths (tests, Coverity 'idir' scan dirs, Detect
+# Strip known-noise matched file paths (tests, Coverity 'java-api-stubs.jar', Detect
 # run folders/jars, virtualenv folders, hidden dot-folders) before curation
 bd-ai-curate "Small Demo Main" 1.0_latest --filter_paths
 
@@ -68,7 +68,7 @@ Strips matched file paths that fall under known build-tooling/scan-artifact
 locations before any grouping or LLM call:
 - hidden dot-folders (`.git`, `.venv`, `.m2`, ...)
 - test folders (`test`, `tests`, `__tests__`, `spec`/`specs`)
-- Coverity scan intermediate dirs (everything under `idir`, e.g. `idir/emit`)
+- Coverity stub jar (`java-api-stubs.jar`, the only matchable file in a Coverity `idir`; the top-level `idir` folder name varies, so the file name is matched instead)
 - Detect run folders/jars (`blackduck-detect*`, `synopsys-detect*`)
 - `venv`/`virtualenv` folders.
 

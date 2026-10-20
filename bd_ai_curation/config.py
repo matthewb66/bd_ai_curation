@@ -28,7 +28,7 @@ parser.add_argument("--include_unconfirmed_snippets",
                              "REVIEWED) only with --update_bom; all others are left for manual review",
                         action='store_true')
 parser.add_argument("--filter_paths",
-                        help="Strip known-noise matched file paths (tests, Coverity 'idir' scan dirs, "
+                        help="Strip known-noise matched file paths (tests, Coverity 'java-api-stubs.jar', "
                              "Detect run folders/jars, virtualenv folders, hidden dot-folders) before curation; "
                              "a component left with no real evidence is auto-ignored/rejected without an LLM call",
                         action='store_true')

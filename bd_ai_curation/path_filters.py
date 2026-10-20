@@ -21,7 +21,7 @@ _END = r'(?:[/#]|$)'
 _NOISE_PATH_REGEXES = [
     re.compile(_SEG + r'\.[^/#]+' + _END),  # hidden/dotfile folders (.git, .venv, .m2, ...)
     re.compile(_SEG + r'(tests?|__tests__|spec|specs)' + _END, re.IGNORECASE),  # test folders
-    re.compile(_SEG + r'idir' + _END, re.IGNORECASE),  # Coverity intermediate dir (idir/emit/...)
+    re.compile(_SEG + r'java-api-stubs\.jar(?=[/#!]|$)', re.IGNORECASE),  # Coverity stub jar (only matchable file in its idir)
     re.compile(_SEG + r'(venv|virtualenv)' + _END, re.IGNORECASE),  # Python virtualenv folders
     re.compile(_SEG + r'(blackduck-detect|synopsys-detect)[^/#]*' + _END, re.IGNORECASE),  # Detect run folders/jars
 ]
