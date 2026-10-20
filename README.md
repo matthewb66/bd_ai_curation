@@ -129,6 +129,54 @@ writes to the live BOM:
 Dry-run reports the proposed confirmations. Only `--update_bom` writes them, via
 `PUT .../bulk-snippet-bom-entries` in chunks of 100.
 
+## Options Reference
+
+Usage: `bd-ai-curate PROJECT VERSION [options]`. `PROJECT` and `VERSION` are the Black Duck project and version names. Run `bd-ai-curate -h` for the same list.
+
+### Positional arguments
+
+| Argument | Description |
+|---|---|
+| `project` | Black Duck project name. If it is not found, the command lists projects whose names contain the string and exits. |
+| `version` | Black Duck project version name. If it is not found, the command lists the project's versions and exits. |
+
+### Connection
+
+| Option | Default | Description |
+|---|---|---|
+| `--blackduck_url URL` | `BLACKDUCK_URL` (or `BLACKDUCK_BDSCA_URL`) | Black Duck server URL. Required if the environment variable is not set. |
+| `--blackduck_api_token TOKEN` | `BLACKDUCK_API_TOKEN` (or `BLACKDUCK_BDSCA_TOKEN`) | Black Duck API token. Required if the environment variable is not set. Prefer the environment variable so the token does not appear in shell history. |
+| `--blackduck_trust_cert` | off | Trust the server certificate. Also enabled by `BLACKDUCK_TRUST_CERT=true`. |
+
+The Anthropic credentials are read from `ANTHROPIC_AUTH_TOKEN` or `ANTHROPIC_API_KEY`, with `ANTHROPIC_BASE_URL` optional. The run stops if neither key is set.
+
+### Curation scope
+
+| Option | Default | Description |
+|---|---|---|
+| `--update_bom` | off (dry-run) | Write the decisions to the project version: ignore, mark reviewed, set versions, confirm or reject Match Review and snippet matches, and add comments. Without it, nothing is changed. |
+| `--include_match_review` | off | Also curate Match Review `LOW_MATCH_SCORE` components. Additive to the BOM components. See the section above. |
+| `--include_unconfirmed_snippets` | off | Also curate unconfirmed (`NOT_REVIEWED`) snippet matches. See the section above. |
+| `--filter_paths` | off | Ignore matched paths under test, build, Coverity, Detect, virtualenv and hidden folders before curation. See the section above. |
+
+### Output
+
+| Option | Default | Description |
+|---|---|---|
+| `--report_file FILE` | none | Write the text report to FILE. The run stops if FILE already exists. |
+| `--decisions_file FILE` | `bd_ai_curation_decisions.json` | JSON decision log, written on every run. Includes the match types for each decision. |
+| `--logfile FILE` | none (console only) | Also write the log to FILE. The run stops if FILE already exists. |
+| `--debug` | off | Enable debug logging. |
+
+### Model and concurrency
+
+| Option | Default | Description |
+|---|---|---|
+| `--model NAME` | `claude-haiku-5-5` | Anthropic model used for curation decisions. |
+| `--max_components_per_llm_call N` | `20` | Maximum components or groups sent in one LLM call. |
+| `--max_concurrent_llm_calls N` | `5` | Maximum concurrent LLM calls. |
+| `--max_concurrent_rest_requests N` | `10` | Maximum concurrent Black Duck REST requests. |
+
 ## Performance
 
 The REST BOM fetch (matched-files per origin) and the LLM batch calls both run

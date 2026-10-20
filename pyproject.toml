@@ -33,3 +33,6 @@ log_cli_level = "INFO"
 
 [project.scripts]
 bd-ai-curate = "bd_ai_curation.main:main"
+
+[tool.setuptools.packages.find]
+include = ["bd_ai_curation*"]
