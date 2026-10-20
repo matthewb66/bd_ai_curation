@@ -137,3 +137,10 @@ def test_set_version_put_body_matches_reference_shape(monkeypatch):
         'origins': [],
     }
     assert captured['comments'] == [entry_href]
+
+
+def test_candidate_tokens_are_dotted_numbers_from_own_path_only():
+    paths = ['usr/lib/avahi-6.0.1/libavahi-core.so.6.0.1#R7000-V1.0.7.2_1.1.93.chk',
+             'usr/lib/avahi-6.0.1/a.c']
+    tokens = version_resolver.candidate_version_tokens(paths)
+    assert tokens == {'6.0.1'}

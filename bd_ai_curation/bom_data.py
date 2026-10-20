@@ -1,8 +1,10 @@
 import asyncio
 import logging
 import re
+from urllib.parse import urlencode
 
 from . import global_values
+from . import version_resolver
 from .models import BomComponent, Origin, SnippetBlock
 
 BOM6_ACCEPT = "application/vnd.blackducksoftware.bill-of-materials-6+json"
@@ -186,24 +188,42 @@ async def fetch_bom_components(projver_href, fetch_matched_files=True):
     return components
 
 
-async def fetch_kb_versions(projver_href, component_ids) -> dict[str, list[tuple[str, str]]]:
-    """component_id -> [(versionName, version_href)] from the KB component's versions list.
-    A failed lookup is logged and yields an empty list (the entry then gets no version)."""
+async def fetch_kb_versions(projver_href, entries: list[BomComponent]) -> dict[str, list[tuple[str, str]]]:
+    """component_id -> [(versionName, version_href)] for the KB versions named by the
+    dotted version tokens in each component's matched paths. Listing all versions of a
+    large component times out, so each token is looked up with a versionName filter and
+    the version_resolver then picks the exact name from the path. A failed lookup is
+    logged and yields no versions for that token (the entry then gets no version)."""
     base = projver_href.partition('/api/')[0]
     sem = _rest_semaphore()
 
-    async def one(component_id):
-        url = f"{base}/api/components/{component_id}/versions?limit=1000"
-        try:
-            items = await get_paginated_data(url, SNIPPET_ACCEPT, sem=sem)
-        except Exception as exc:
-            logging.warning(f"Failed to fetch KB versions for component {component_id}: {exc}")
+    tokens_by_component: dict[str, set[str]] = {}
+    for entry in entries:
+        if entry.component_id:
+            tokens_by_component.setdefault(entry.component_id, set()).update(
+                version_resolver.candidate_version_tokens(entry.matched_file_paths))
+
+    async def lookup(component_id, token):
+        query = urlencode({"q": f"versionName:{token}", "limit": 1000})
+        url = f"{base}/api/components/{component_id}/versions?{query}"
+        items = await get_paginated_data(url, SNIPPET_ACCEPT, sem=sem)
+        return [(v.get('versionName', ''), v.get('_meta', {}).get('href', ''))
+                for v in items if v.get('versionName')]
+
+    async def one(component_id, tokens):
+        if not tokens:
             return component_id, []
-        versions = [(v.get('versionName', ''), v.get('_meta', {}).get('href', ''))
-                    for v in items if v.get('versionName')]
+        results = await asyncio.gather(*(lookup(component_id, t) for t in sorted(tokens)),
+                                       return_exceptions=True)
+        versions = []
+        for token, result in zip(sorted(tokens), results):
+            if isinstance(result, Exception):
+                logging.warning(f"Failed to fetch KB version '{token}' for component {component_id}: {result}")
+                continue
+            versions += result
         return component_id, versions
 
-    results = await asyncio.gather(*(one(cid) for cid in component_ids))
+    results = await asyncio.gather(*(one(cid, toks) for cid, toks in tokens_by_component.items()))
     return dict(results)
 
 

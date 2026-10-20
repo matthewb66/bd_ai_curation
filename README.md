@@ -1,4 +1,4 @@
-# bd_ai_curation - v0.1.0
+# bd_ai_curation - v0.1.1
 
 Agentic Black Duck SCA BOM curation utility.
 Replicates manual BOM curation tasks -
@@ -13,6 +13,7 @@ optionally confirming/rejecting Match Review matches and snippet matches - using
 - The option `--include_match_review` will also process low match score components in the Match Review page
 - The option `--include_unconfirmed_snippets` will also process unconfirmed snippets, adding components to the BOM where snippet matches indicate their presence
 - The option `filter_paths` will look for test folders, dot folders, virtualenv, Black Duck tool and other folders and mark components within them as ignored
+- Unversioned binary matches get a version from the dotted version numbers in their matched file paths. Only the KB versions named by those numbers are looked up (with a `versionName` filter), so components with very large version histories are no longer skipped by a timeout. The version is set only when a single candidate is found in at least half of the matched paths; otherwise the entry is left for manual review.
 - When `--update_bom` is specified, components will be marked as ignored or marked as reviewed if confirmed (with comments added to explain the decision). Components left without review status are intended for manual review. A project version comment is added to document the AI Review process.
 
 Multiple match types are considered in the analysis including Dependency (all of which will be confirmed), Signature (exact file, exact folder, files modified), snippet (components already added to the BOM as snippets), binary with and without version and optionally match review (low match score only)/unconfirmed snipper matches.

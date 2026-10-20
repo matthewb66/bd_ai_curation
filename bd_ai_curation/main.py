@@ -61,8 +61,7 @@ async def cmd_curate_async():
             for c in u_auto
         ]
         versioned_bom = [c for c in all_components if c.version and c.match_review_type is None]
-        kb_versions = await bom_data.fetch_kb_versions(
-            projver_href, {c.component_id for c in u_todo if c.component_id})
+        kb_versions = await bom_data.fetch_kb_versions(projver_href, u_todo)
         version_decisions += version_resolver.decide_unversioned(u_todo, kb_versions, versioned_bom)
         logging.info(f"- {len(unversioned)} unversioned components: {len(version_decisions)} resolved to a "
                      f"version decision (set version, ignore duplicate, or manual review)")

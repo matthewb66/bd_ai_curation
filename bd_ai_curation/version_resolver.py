@@ -14,6 +14,9 @@ from .models import BomComponent, CurationAction, CurationDecision
 
 MIN_PATH_SUPPORT = 0.5
 DUPLICATE_OVERLAP = 0.5
+MAX_CANDIDATE_TOKENS = 25
+
+_VERSION_TOKEN = re.compile(r'(?<!\d)(\d+(?:\.\d+)+)(?!\d)')
 
 
 @dataclass
@@ -28,6 +31,17 @@ def _version_pattern(names) -> re.Pattern:
     alternatives = sorted(names, key=len, reverse=True)
     body = '|'.join(re.escape(n) for n in alternatives)
     return re.compile(r'(?<![0-9A-Za-z.])[vV]?(' + body + r')(?![0-9A-Za-z]|\.[0-9])')
+
+
+def candidate_version_tokens(paths: list[str]) -> set[str]:
+    """Dotted numeric tokens (e.g. '6.0.1') in the file's own path, most frequent first.
+    Only these are looked up in the KB, so single-number and underscore versions are not
+    inferred from paths."""
+    counts: Counter = Counter()
+    for path in paths:
+        inner = path.split('#', 1)[0]
+        counts.update(set(_VERSION_TOKEN.findall(inner)))
+    return {token for token, _ in counts.most_common(MAX_CANDIDATE_TOKENS)}
 
 
 def infer_version(paths: list[str], kb_versions: list[tuple[str, str]]) -> VersionInference:
