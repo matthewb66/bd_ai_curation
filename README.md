@@ -16,7 +16,7 @@ optionally confirming/rejecting Match Review matches and snippet matches - using
 - Unversioned binary matches get a version from the dotted version numbers in their matched file paths. Only the KB versions named by those numbers are looked up (with a `versionName` filter), so components with very large version histories are no longer skipped by a timeout. The version is set only when a single candidate is found in at least half of the matched paths; otherwise the entry is left for manual review.
 - When `--update_bom` is specified, components will be marked as ignored or marked as reviewed if confirmed (with comments added to explain the decision). Components left without review status are intended for manual review. A project version comment is added to document the AI Review process.
 
-Multiple match types are considered in the analysis including Dependency (all of which will be confirmed), Signature (exact file, exact folder, files modified), snippet (components already added to the BOM as snippets), binary with and without version and optionally match review (low match score only)/unconfirmed snipper matches.
+Multiple match types are considered in the analysis including Dependency (all of which will be confirmed), Signature (exact file, exact folder, files modified), snippet (components already added to the BOM as snippets), binary with and without version and optionally match review (low match score only)/unconfirmed snippet matches.
 
 Duplicate or overlapping components across match types will be reviewed, choosing the strongest version match where appropriate across all match types.
 
@@ -31,8 +31,7 @@ uv pip install -e .
 
 ## Configuration
 
-Environment variables (already set in this environment, pointing at the same
-Black Duck server used by the connected MCP plugin):
+Required Environment variables:
 
 - `BLACKDUCK_URL` / `BLACKDUCK_API_TOKEN` (REST API) - falls back to
   `BLACKDUCK_BDSCA_URL` / `BLACKDUCK_BDSCA_TOKEN` if unset.
@@ -43,9 +42,9 @@ Black Duck server used by the connected MCP plugin):
 
 ```bash
 # Curation (REST + LLM). Dry-run by default - reports proposed decisions only.
-bd-ai-curate "Small Demo Main" 1.0_latest --report_file report.txt
+bd-ai-curate "Small Demo Main" 1.0_latest
 
-# Include Match Review (snippet/low-match-score + unmatched) components
+# Include Match Review (low-match-score + unmatched) components
 bd-ai-curate "Small Demo Main" 1.0_latest --include_match_review
 
 # Strip known-noise matched file paths (tests, Coverity 'idir' scan dirs, Detect
@@ -139,6 +138,4 @@ concurrently rather than one at a time, bounded by:
 
 ## Safety
 
-The script is **dry-run by default**. BOM mutations only happen when `--update_bom` is
-
-explicitly passed.
+The script is **dry-run by default**. BOM mutations only happen when `--update_bom` is explicitly passed.
