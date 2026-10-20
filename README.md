@@ -41,32 +41,37 @@ Required Environment variables:
 ## Usage
 
 ```bash
+cd bd_ai_curation
+
 # Curation (REST + LLM). Dry-run by default - reports proposed decisions only.
-bd-ai-curate "Small Demo Main" 1.0_latest
+python3 -m bd_ai_curation.main "Small Demo Main" 1.0_latest
 
 # Include Match Review (low-match-score + unmatched) components
-bd-ai-curate "Small Demo Main" 1.0_latest --include_match_review
+python3 -m bd_ai_curation.main "Small Demo Main" 1.0_latest --include_match_review
+
+# Also curate unconfirmed (NOT_REVIEWED) snippet matches, grouped by component
+python3 -m bd_ai_curation.main "Small Demo Main" 1.0_latest --include_unconfirmed_snippets
 
 # Strip known-noise matched file paths (tests, Coverity 'idir' scan dirs, Detect
 # run folders/jars, virtualenv folders, hidden dot-folders) before curation
-bd-ai-curate "Small Demo Main" 1.0_latest --filter_paths
-
-# Also curate unconfirmed (NOT_REVIEWED) snippet matches, grouped by component
-bd-ai-curate "Small Demo Main" 1.0_latest --include_unconfirmed_snippets
+python3 -m bd_ai_curation.main "Small Demo Main" 1.0_latest --filter_paths
 
 # Apply decisions to the live BOM (only after reviewing a dry-run report!)
-bd-ai-curate "Small Demo Main" 1.0_latest --update_bom
+python3 -m bd_ai_curation.main "Small Demo Main" 1.0_latest --update_bom
 ```
 
 ### `--filter_paths` Option
 
 Strips matched file paths that fall under known build-tooling/scan-artifact
-locations before any grouping or LLM call: hidden dot-folders (`.git`, `.venv`,
-`.m2`, ...), test folders (`test`, `tests`, `__tests__`, `spec`/`specs`),
-Coverity scan intermediate dirs (everything under `idir`, e.g. `idir/emit`),
-Detect run folders/jars (`blackduck-detect*`, `synopsys-detect*`), and
-`venv`/`virtualenv` folders. A signature-only or Match Review component left
-with zero matched file paths after filtering is auto-decided deterministically
+locations before any grouping or LLM call:
+- hidden dot-folders (`.git`, `.venv`, `.m2`, ...)
+- test folders (`test`, `tests`, `__tests__`, `spec`/`specs`)
+- Coverity scan intermediate dirs (everything under `idir`, e.g. `idir/emit`)
+- Detect run folders/jars (`blackduck-detect*`, `synopsys-detect*`)
+- `venv`/`virtualenv` folders.
+
+A signature-only or Match Review component left
+with zero matched file paths after path filtering is auto-decided deterministically
 (`IGNORE`, or `REJECT_MATCH_REVIEW` for a Match Review candidate) without
 spending an LLM call on it - these are reported with confidence 1.0 and a
 reasoning string that cites the number of noise paths removed. Dependency
@@ -106,9 +111,7 @@ Match Review snippets are a different source from the per-file snippet blocks in
 
 Fetches the snippet matches that are still `NOT_REVIEWED` in the version's
 `source-bom-entries` (the same internal endpoint `ignore_snippets.py` uses) and
-groups them by reported component/version. These are per-file snippet blocks, so
-they are not in `review-components` and `--include_match_review` does not cover
-them.
+groups them by reported component/version.
 
 The decision is deterministic and rule-based, not LLM-based, because confirmation
 writes to the live BOM:
@@ -123,10 +126,6 @@ writes to the live BOM:
 
 Dry-run reports the proposed confirmations. Only `--update_bom` writes them, via
 `PUT .../bulk-snippet-bom-entries` in chunks of 100.
-
-The utility (dry-run or applied) writes a JSON decision log
-(`--decisions_file`, default `bd_ai_curation_decisions.json`) for audit/replay,
-and prints a summary + per-component report table.
 
 ## Performance
 
