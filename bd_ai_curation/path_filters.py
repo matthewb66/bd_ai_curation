@@ -59,6 +59,8 @@ def _filter_component_paths(comp: BomComponent) -> int:
     """Strips noise paths from comp.matched_file_paths in place. Returns the
     number of paths removed."""
     before = len(comp.matched_file_paths)
+    if not comp.all_matched_file_paths:
+        comp.all_matched_file_paths = list(comp.matched_file_paths)
     comp.matched_file_paths = [p for p in comp.matched_file_paths if not is_noise_path(p)]
     return before - len(comp.matched_file_paths)
 

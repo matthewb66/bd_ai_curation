@@ -21,6 +21,8 @@ class BomComponent(BaseModel):
     match_types: list[str] = Field(default_factory=list)
     origins: list[Origin] = Field(default_factory=list)
     matched_file_paths: list[str] = Field(default_factory=list)
+    # Paths as fetched from the server, before --filter_paths strips noise from matched_file_paths.
+    all_matched_file_paths: list[str] = Field(default_factory=list)
     ignored: bool = False
     review_status: Optional[str] = None
     policy_status: Optional[str] = None

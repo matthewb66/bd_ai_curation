@@ -7,6 +7,8 @@ from . import global_values
 from .models import BomComponent, CurationDecision
 
 MIN_SUBFOLDER_MATCHES_TO_SUMMARISE = 3
+# Used only by the SET_VERSION apply path; never populated in a logged run, so kept out of the JSON.
+_DECISION_LOG_OMITTED_FIELDS = ("new_version_href", "usages")
 
 
 class _PathNode:
@@ -86,12 +88,13 @@ def write_decisions_log(decisions: list[CurationDecision], components: list[BomC
     if not global_values.decisions_file:
         return
 
-    signature_paths = {c.href: c.matched_file_paths for c in components if c.is_signature() or not c.version}
+    signature_paths = {c.href: c.all_matched_file_paths or c.matched_file_paths
+                       for c in components if c.is_signature() or not c.version}
     match_types_by_href = {c.href: c.match_types for c in components}
 
     decision_entries = []
     for d in decisions:
-        entry = d.model_dump()
+        entry = d.model_dump(exclude=set(_DECISION_LOG_OMITTED_FIELDS))
         entry["match_types"] = match_types_by_href.get(d.target_href, [])
         if d.target_href in signature_paths:
             paths = signature_paths[d.target_href]
