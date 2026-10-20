@@ -5,6 +5,7 @@ from datetime import date
 from . import bom_data
 from . import bom_writer
 from . import config
+from . import container_binary
 from . import curation_engine
 from . import global_values
 from . import grouping
@@ -37,6 +38,14 @@ async def cmd_curate_async():
     elif noise_path_count:
         logging.info(f"- {noise_path_count} matched file paths across {noise_comp_count} components sit under "
                      f"known noise locations and would be excluded by --filter_paths")
+
+    container_decisions = []
+    if container_binary.is_container_scan(all_components):
+        noise_hrefs = {d.target_href for d in noise_decisions}
+        container_decisions, components = container_binary.decide(
+            components, [c for c in all_components if c.href not in noise_hrefs])
+        logging.info(f"- Container scan detected - {len(container_decisions)} BINARY-only entries assessed "
+                     f"against other BOM entries for the same component")
 
     unversioned = [c for c in components if not c.version]
     components = [c for c in components if c.version]
@@ -90,6 +99,7 @@ async def cmd_curate_async():
         for c in auto_reviewed
     ]
     decisions += noise_decisions
+    decisions += container_decisions
     decisions += settled_decisions
     decisions += version_decisions
 

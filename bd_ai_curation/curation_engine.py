@@ -212,6 +212,18 @@ _CROSS_REFERENCE_PATTERNS = re.compile(r"\b(see|refer to|per) (the |a |an )?(fir
                                        r"\bplaceholder\b", re.IGNORECASE)
 
 
+_PACKAGE_DATABASE_PATH = re.compile(r"(^|/)var/lib/dpkg/status(?=[#!/]|$)", re.IGNORECASE)
+
+
+def _ddb_evidence_is_database_only(comp: BomComponent) -> bool:
+    """A DIRECT_DEPENDENCY_BINARY match whose only evidence is the dpkg status database
+    names no installed file, so it cannot confirm the version on its own. RPM database
+    matches are kept: RPM-owned files are real evidence and rpm-only packages can ship no files."""
+    if comp.match_types != ['DIRECT_DEPENDENCY_BINARY'] or not comp.matched_file_paths:
+        return False
+    return all(_PACKAGE_DATABASE_PATH.search(p) for p in comp.matched_file_paths)
+
+
 def _consolidate_is_malformed(decision: CurationDecision) -> bool:
     if not decision.keep_href or not decision.ignore_hrefs:
         return True
@@ -289,6 +301,12 @@ async def _decisions_for_batch(client, sem: asyncio.Semaphore, task: str, batch,
         if decision.action == CurationAction.CONFIRM_REVIEWED and _reasoning_defers(decision.reasoning):
             logging.warning(f"CONFIRM_REVIEWED for '{decision.target_name}/{decision.target_version}' "
                              f"contradicts its own reasoning - downgrading to NO_ACTION_MANUAL_REVIEW")
+            decision.action = CurationAction.NO_ACTION_MANUAL_REVIEW
+        source = next((c for c in batch if c.href == decision.target_href), None)
+        if (decision.action == CurationAction.CONFIRM_REVIEWED and source is not None
+                and _ddb_evidence_is_database_only(source)):
+            logging.warning(f"CONFIRM_REVIEWED for '{decision.target_name}/{decision.target_version}' rests only on "
+                            f"the package database - downgrading to NO_ACTION_MANUAL_REVIEW")
             decision.action = CurationAction.NO_ACTION_MANUAL_REVIEW
         if decision.action == CurationAction.CONSOLIDATE and _consolidate_is_malformed(decision):
             logging.warning(f"CONSOLIDATE for '{decision.target_name}/{decision.target_version}' is missing "
