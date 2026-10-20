@@ -40,24 +40,26 @@ Required Environment variables:
 
 ## Usage
 
+Ensure you are in the same location where the virtualenv was created in Installation step above.
+
 ```bash
-cd bd_ai_curation
+source .venv/bin/activate
 
 # Curation (REST + LLM). Dry-run by default - reports proposed decisions only.
-python3 -m bd_ai_curation.main "Small Demo Main" 1.0_latest
+bd-ai-curate "Small Demo Main" 1.0_latest
 
 # Include Match Review (low-match-score + unmatched) components
-python3 -m bd_ai_curation.main "Small Demo Main" 1.0_latest --include_match_review
+bd-ai-curate "Small Demo Main" 1.0_latest --include_match_review
 
 # Also curate unconfirmed (NOT_REVIEWED) snippet matches, grouped by component
-python3 -m bd_ai_curation.main "Small Demo Main" 1.0_latest --include_unconfirmed_snippets
+bd-ai-curate "Small Demo Main" 1.0_latest --include_unconfirmed_snippets
 
 # Strip known-noise matched file paths (tests, Coverity 'idir' scan dirs, Detect
 # run folders/jars, virtualenv folders, hidden dot-folders) before curation
-python3 -m bd_ai_curation.main "Small Demo Main" 1.0_latest --filter_paths
+bd-ai-curate "Small Demo Main" 1.0_latest --filter_paths
 
 # Apply decisions to the live BOM (only after reviewing a dry-run report!)
-python3 -m bd_ai_curation.main "Small Demo Main" 1.0_latest --update_bom
+bd-ai-curate "Small Demo Main" 1.0_latest --update_bom
 ```
 
 ### `--filter_paths` Option
