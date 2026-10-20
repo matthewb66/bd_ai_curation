@@ -10,7 +10,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 
-from .models import BomComponent, CurationAction, CurationDecision
+from .models import BomComponent, CurationAction, CurationDecision, same_component
 
 MIN_PATH_SUPPORT = 0.5
 DUPLICATE_OVERLAP = 0.5
@@ -70,11 +70,6 @@ def infer_version(paths: list[str], kb_versions: list[tuple[str, str]]) -> Versi
     return VersionInference((name, by_name[name]), candidates, support, len(paths))
 
 
-def _is_same_component(bom_comp: BomComponent, entry: BomComponent) -> bool:
-    return bool((entry.component_id and bom_comp.component_id == entry.component_id)
-                or bom_comp.name.lower() == entry.name.lower())
-
-
 def _is_same_version(bom_comp: BomComponent, name: str, href: str) -> bool:
     version_id = href.rsplit('/', 1)[-1]
     return bom_comp.version == name or bool(bom_comp.component_version_id
@@ -83,7 +78,7 @@ def _is_same_version(bom_comp: BomComponent, name: str, href: str) -> bool:
 
 def _decide_for_version(entry: BomComponent, name: str, href: str, support: int, total: int,
                         bom_versioned: list[BomComponent]) -> CurationDecision:
-    dups = [c for c in bom_versioned if _is_same_component(c, entry)]
+    dups = [c for c in bom_versioned if same_component(c, entry)]
 
     if any(_is_same_version(d, name, href) for d in dups):
         return CurationDecision(

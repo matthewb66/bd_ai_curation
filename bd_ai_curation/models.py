@@ -49,6 +49,10 @@ class BomComponent(BaseModel):
         return self.review_status == 'REVIEWED'
 
 
+def same_component(a: BomComponent, b: BomComponent) -> bool:
+    return bool((a.component_id and a.component_id == b.component_id) or a.name.lower() == b.name.lower())
+
+
 class SnippetBlock(BaseModel):
     """One unconfirmed snippet match: a fileSnippetBomComponents block plus the scanned
     file it belongs to. `source` keeps only the scan-file fields the confirm write needs

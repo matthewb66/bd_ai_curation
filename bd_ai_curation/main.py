@@ -16,6 +16,10 @@ from . import snippet_curation
 from . import version_resolver
 from .models import CurationAction, CurationDecision
 
+DEPENDENCY_CONFIRM_REASONING = ("Dependency match (declared manifest/package-manager dependency) - "
+                                "high confidence, no signature-path judgment required.")
+
+
 async def cmd_curate_async():
     projver = rest_client.get_project_version(global_values.bd_project, global_values.bd_version)
     projver_href = projver['_meta']['href']
@@ -63,9 +67,7 @@ async def cmd_curate_async():
         version_decisions += [
             CurationDecision(
                 action=CurationAction.CONFIRM_REVIEWED, target_name=c.name, target_version=c.version,
-                target_href=c.href, confidence=1.0,
-                reasoning="Dependency match (declared manifest/package-manager dependency) - "
-                          "high confidence, no signature-path judgment required.",
+                target_href=c.href, confidence=1.0, reasoning=DEPENDENCY_CONFIRM_REASONING,
             )
             for c in u_auto
         ]
@@ -93,8 +95,7 @@ async def cmd_curate_async():
             target_version=c.version,
             target_href=c.href,
             confidence=1.0,
-            reasoning="Dependency match (declared manifest/package-manager dependency) - "
-                      "high confidence, no signature-path judgment required.",
+            reasoning=DEPENDENCY_CONFIRM_REASONING,
         )
         for c in auto_reviewed
     ]

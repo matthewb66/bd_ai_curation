@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from rapidfuzz import fuzz
 
-from .models import BomComponent, CurationAction, CurationDecision
+from .models import BomComponent, CurationAction, CurationDecision, same_component
 
 
 @dataclass
@@ -87,11 +87,7 @@ def find_duplicate_groups(components: list[BomComponent]) -> list[DuplicateGroup
             if j in assigned:
                 continue
             comp2 = components[j]
-            same = (
-                (comp1.component_id and comp1.component_id == comp2.component_id)
-                or comp1.name.lower() == comp2.name.lower()
-            )
-            if same:
+            if same_component(comp1, comp2):
                 group.append(comp2)
                 assigned.add(j)
 

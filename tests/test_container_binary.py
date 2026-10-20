@@ -6,7 +6,8 @@ BLOB = 'var/lib/dpkg/status/#a0e794d5!/blobs/sha256/4a5d42c7!/'
 
 def _comp(name, version, match_types, cid='c1', href=None, paths=None, review=None, ignored=False):
     return BomComponent(name=name, version=version, href=href or f'https://bd/{name}/{version}/{cid}',
-                        component_id=cid, match_types=match_types, matched_file_paths=paths or [BLOB],
+                        component_id=cid, match_types=match_types,
+                        matched_file_paths=[BLOB] if paths is None else paths,
                         match_review_type=review, ignored=ignored)
 
 
@@ -28,13 +29,23 @@ def test_binary_only_duplicate_of_dependency_entry_is_ignored():
     assert [c.href for c in remaining] == ['https://bd/dep']
 
 
-def test_two_binary_only_entries_never_ignore_each_other():
+def test_binary_only_duplicate_of_binary_entry_is_ignored_except_lowest_href():
     other = _comp('zlib', '1.2.11', ['BINARY'], href='https://bd/other')
     bin_only = _comp('zlib', '1.2.11', ['BINARY'], href='https://bd/bin')
     comps = [other, bin_only]
     decisions, remaining = container_binary.decide(comps, comps)
-    assert all(d.action == CurationAction.NO_ACTION_MANUAL_REVIEW for d in decisions)
+    by_href = {d.target_href: d.action for d in decisions}
+    assert by_href == {'https://bd/bin': CurationAction.NO_ACTION_MANUAL_REVIEW,
+                       'https://bd/other': CurationAction.IGNORE}
     assert remaining == []
+
+
+def test_binary_only_group_always_keeps_one_entry_for_review():
+    group = [_comp('zlib', '1.2.11', ['BINARY'], href=f'https://bd/{i}') for i in range(3)]
+    decisions, _ = container_binary.decide(group, group)
+    kept = [d.target_href for d in decisions if d.action == CurationAction.NO_ACTION_MANUAL_REVIEW]
+    assert kept == ['https://bd/0']
+    assert sorted(d.target_href for d in decisions if d.action == CurationAction.IGNORE) == ['https://bd/1', 'https://bd/2']
 
 
 def test_binary_only_with_no_peer_is_manual_review():
